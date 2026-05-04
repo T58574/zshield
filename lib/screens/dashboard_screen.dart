@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../widgets/glass_panel.dart';
+import '../widgets/status_glow.dart';
+import '../core/theme/app_theme.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -9,6 +11,7 @@ import '../providers/vpn_provider.dart';
 import '../providers/config_provider.dart';
 import '../providers/traffic_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/premium_server_provider.dart';
 import 'package:go_router/go_router.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -57,6 +60,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final configNotifier = ref.read(configProvider.notifier);
     
     final trafficState = ref.watch(trafficProvider);
+    ref.watch(premiumServerProvider);
 
     // Compute display values from real traffic data
     final totalTraffic = _formatBytes(trafficState.totalUplink + trafficState.totalDownlink);
@@ -120,19 +124,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppTheme.accentBlue.withOpacity(0.2),
+                              color: AppTheme.accent.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppTheme.accentBlue.withOpacity(0.5)),
+                              border: Border.all(color: AppTheme.accent.withValues(alpha: 0.5)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.star, size: 12, color: AppTheme.accentBlue),
+                                Icon(Icons.star, size: 12, color: AppTheme.accent),
                                 const SizedBox(width: 4),
                                 Text(
                                   'PREMIUM',
                                   style: TextStyle(
-                                    color: AppTheme.accentBlue,
+                                    color: AppTheme.accent,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 1,
@@ -167,7 +171,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ref.watch(authProvider).isAuthenticated 
                           ? Icons.person_outline 
                           : Icons.login_outlined,
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                       ),
                       tooltip: ref.watch(authProvider).isAuthenticated ? 'Profile' : 'Sign In',
                     ),
@@ -243,67 +247,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         Text('Protocol: VLESS Handshake Ready', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10, color: Colors.white24)),
                         const SizedBox(height: 40),
                         Center(
-                          child: StatefulBuilder(
-                            builder: (context, setState) {
-                              bool isHovered = false;
-                              return MouseRegion(
-                                onEnter: (_) => setState(() => isHovered = true),
-                                onExit: (_) => setState(() => isHovered = false),
-                                child: InkWell(
-                                  onTap: isConnecting ? null : () {
-                                    if (isConnected) {
-                                      ref.read(vpnProvider.notifier).disconnect();
-                                    } else {
-                                      ref.read(vpnProvider.notifier).connect(configState);
-                                    }
-                                  },
-                                  borderRadius: BorderRadius.circular(100),
-                                  child: StatusGlow(
-                                    animate: isConnected || isConnecting,
-                                    color: isConnected ? AppTheme.accent : (isConnecting ? Colors.white : Colors.white24),
-                                    child: AnimatedScale(
-                                      scale: isHovered ? 1.05 : 1.0,
-                                      duration: const Duration(milliseconds: 200),
-                                      curve: Curves.easeOutCubic,
-                                      child: Container(
-                                        width: 176,
-                                        height: 176,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: isConnected ? AppTheme.accent.withOpacity(0.1) : Colors.white.withValues(alpha: 0.05),
-                                          border: Border.all(
-                                            color: isConnected ? AppTheme.accent.withOpacity(0.8) : Colors.white.withValues(alpha: 0.2),
-                                            width: 0.5,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            isConnecting 
-                                              ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                                              : Icon(
-                                                  isConnected ? Symbols.shield_with_heart : Symbols.power_settings_new, 
-                                                  size: 48, 
-                                                  color: isConnected ? AppTheme.accent : Colors.white.withValues(alpha: 0.4), 
-                                                  weight: 300,
-                                                  fill: isConnected ? 1 : 0,
-                                                ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              isConnected ? 'SECURED' : (isConnecting ? 'CONNECTING' : 'DISCONNECTED'), 
-                                              style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                                                fontSize: 14, 
-                                                letterSpacing: 4,
-                                                color: isConnected ? AppTheme.accent : Colors.white.withValues(alpha: 0.6),
-                                              )
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
+                          child: _ConnectButton(
+                            isConnected: isConnected,
+                            isConnecting: isConnecting,
+                            onTap: isConnecting ? null : () {
+                              if (isConnected) {
+                                ref.read(vpnProvider.notifier).disconnect();
+                              } else {
+                                ref.read(vpnProvider.notifier).connect(configState);
+                              }
                             },
                           ),
                         ),
@@ -459,13 +411,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             const FlSpot(10, 8.5),
                           ],
                           isCurved: true,
-                          color: AppTheme.accent.withOpacity(0.5),
+                          color: AppTheme.accent.withValues(alpha: 0.5),
                           barWidth: 2,
                           isStrokeCapRound: true,
                           dotData: const FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: AppTheme.accent.withOpacity(0.1),
+                            color: AppTheme.accent.withValues(alpha: 0.1),
                           ),
                         ),
                       ],
@@ -529,7 +481,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Email: ${authState.profile?.email ?? authState.user?.email}', 
+            Text('Email: ${authState.profile?.email ?? authState.authUser?.email}', 
               style: const TextStyle(color: Colors.white70)),
             const SizedBox(height: 8),
             Text('Status: ${authState.isPremium ? "Premium" : "Free"}', 
@@ -554,6 +506,81 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: const Text('Close', style: TextStyle(color: Colors.white)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ConnectButton extends StatefulWidget {
+  final bool isConnected;
+  final bool isConnecting;
+  final VoidCallback? onTap;
+
+  const _ConnectButton({
+    required this.isConnected,
+    required this.isConnecting,
+    this.onTap,
+  });
+
+  @override
+  State<_ConnectButton> createState() => _ConnectButtonState();
+}
+
+class _ConnectButtonState extends State<_ConnectButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(100),
+        child: StatusGlow(
+          animate: widget.isConnected || widget.isConnecting,
+          color: widget.isConnected ? AppTheme.accent : (widget.isConnecting ? Colors.white : Colors.white24),
+          child: AnimatedScale(
+            scale: _isHovered ? 1.05 : 1.0,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            child: Container(
+              width: 176,
+              height: 176,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: widget.isConnected ? AppTheme.accent.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05),
+                border: Border.all(
+                  color: widget.isConnected ? AppTheme.accent.withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.2),
+                  width: 0.5,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  widget.isConnecting
+                    ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                    : Icon(
+                        widget.isConnected ? Symbols.shield_with_heart : Symbols.power_settings_new,
+                        size: 48,
+                        color: widget.isConnected ? AppTheme.accent : Colors.white.withValues(alpha: 0.4),
+                        weight: 300,
+                        fill: widget.isConnected ? 1 : 0,
+                      ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.isConnected ? 'SECURED' : (widget.isConnecting ? 'CONNECTING' : 'DISCONNECTED'),
+                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                      fontSize: 14,
+                      letterSpacing: 4,
+                      color: widget.isConnected ? AppTheme.accent : Colors.white.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

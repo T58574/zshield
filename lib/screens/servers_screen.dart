@@ -7,7 +7,6 @@ import '../widgets/glass_panel.dart';
 import '../widgets/status_glow.dart';
 import '../core/theme/app_theme.dart';
 import '../core/ping_service.dart';
-import 'dart:math';
 
 class ServersScreen extends ConsumerWidget {
   const ServersScreen({super.key});

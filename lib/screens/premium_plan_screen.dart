@@ -13,6 +13,7 @@ class PremiumPlanScreen extends ConsumerWidget {
     // Replace this with your actual Platego.io payment link generation logic
     final url = Uri.parse('https://platego.io/pay/zshield_premium?user_id=$userId');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not launch payment page')),
       );
@@ -75,9 +76,9 @@ class PremiumPlanScreen extends ConsumerWidget {
                       )
                     else
                       GlassButton(
-                        onPressed: () => _launchPayment(context, authState.user!.id),
-                        label: 'Get Premium Now',
+                        onPressed: () => _launchPayment(context, authState.authUser!.id),
                         isPrimary: true,
+                        child: const Text('Get Premium Now'),
                       ),
                   ],
                 ),
@@ -94,7 +95,7 @@ class PremiumPlanScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: AppTheme.accentBlue),
+          Icon(icon, size: 20, color: AppTheme.accent),
           const SizedBox(width: 16),
           Text(label, style: const TextStyle(color: Colors.white, fontSize: 16)),
         ],

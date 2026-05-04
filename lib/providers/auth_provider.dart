@@ -7,12 +7,14 @@ class UserProfile {
   final String email;
   final bool isPremium;
   final DateTime? expiryDate;
+  final String? premiumSubscriptionUrl;
 
   UserProfile({
     required this.id,
     required this.email,
     this.isPremium = false,
     this.expiryDate,
+    this.premiumSubscriptionUrl,
   });
 
   factory UserProfile.fromMap(Map<String, dynamic> map, String email) {
@@ -23,28 +25,29 @@ class UserProfile {
       expiryDate: map['expiry_date'] != null 
           ? DateTime.parse(map['expiry_date'] as String) 
           : null,
+      premiumSubscriptionUrl: map['premium_subscription_url'] as String?,
     );
   }
 }
 
 class AuthState {
-  final User? user;
+  final User? authUser;
   final UserProfile? profile;
   final bool isLoading;
   final String? error;
 
   AuthState({
-    this.user,
+    this.authUser,
     this.profile,
     this.isLoading = false,
     this.error,
   });
 
-  bool get isAuthenticated => user != null;
+  bool get isAuthenticated => authUser != null;
   bool get isPremium => profile?.isPremium ?? false;
 
   AuthState copyWith({
-    User? user,
+    User? authUser,
     UserProfile? profile,
     bool? isLoading,
     String? error,
@@ -52,7 +55,7 @@ class AuthState {
     bool clearProfile = false,
   }) {
     return AuthState(
-      user: clearUser ? null : (user ?? this.user),
+      authUser: clearUser ? null : (authUser ?? this.authUser),
       profile: clearProfile ? null : (profile ?? this.profile),
       isLoading: isLoading ?? this.isLoading,
       error: error,
@@ -67,7 +70,7 @@ class AuthNotifier extends Notifier<AuthState> {
   AuthState build() {
     // Listen to auth changes
     _supabase.auth.onAuthStateChange.listen((data) {
-      final user = data.user;
+      final user = data.session?.user;
       if (user != null) {
         _fetchProfile(user);
       } else {
@@ -75,7 +78,25 @@ class AuthNotifier extends Notifier<AuthState> {
       }
     });
 
-    return AuthState(user: _supabase.auth.currentUser);
+    // Auto-login if no user
+    final currentUser = _supabase.auth.currentUser;
+    if (currentUser != null) {
+      _fetchProfile(currentUser);
+    }
+
+    return AuthState(authUser: currentUser);
+  }
+
+  Future<void> signInAnonymously() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await _supabase.auth.signInAnonymously();
+      if (response.user != null) {
+        await _fetchProfile(response.user!);
+      }
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
   }
 
   Future<void> _fetchProfile(User user) async {
@@ -87,14 +108,13 @@ class AuthNotifier extends Notifier<AuthState> {
           .single();
       
       state = state.copyWith(
-        user: user,
+        authUser: user,
         profile: UserProfile.fromMap(data, user.email ?? ''),
         isLoading: false,
       );
     } catch (e) {
       debugPrint('Error fetching profile: $e');
-      // If profile doesn't exist, we might need to create it or just handle as non-premium
-      state = state.copyWith(user: user, isLoading: false);
+      state = state.copyWith(authUser: user, isLoading: false);
     }
   }
 
@@ -121,8 +141,7 @@ class AuthNotifier extends Notifier<AuthState> {
         password: password,
       );
       if (response.user != null) {
-        // Profile creation is usually handled by a Postgres trigger in Supabase
-        state = state.copyWith(user: response.user, isLoading: false);
+        state = state.copyWith(authUser: response.user, isLoading: false);
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());

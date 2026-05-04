@@ -4,7 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../providers/subscription_provider.dart';
 import '../widgets/glass_panel.dart';
 import '../core/theme/app_theme.dart';
-import 'package:intl/intl.dart';
+
 
 class SubscriptionScreen extends ConsumerWidget {
   const SubscriptionScreen({super.key});
@@ -135,7 +135,8 @@ class _SubscriptionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final lastUpdatedStr = DateFormat('yyyy-MM-dd HH:mm').format(subscription.lastUpdated);
+    final d = subscription.lastUpdated;
+    final lastUpdatedStr = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
     return GlassPanel(
       padding: const EdgeInsets.all(24),
@@ -145,7 +146,7 @@ class _SubscriptionCard extends ConsumerWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
               shape: BoxShape.circle,
             ),
             child: const Icon(Symbols.rss_feed, color: AppTheme.accent, size: 24),
@@ -177,7 +178,7 @@ class _SubscriptionCard extends ConsumerWidget {
                 tooltip: 'Refresh servers',
               ),
               IconButton(
-                icon: const Icon(Symbols.delete, color: Colors.redAccent.withOpacity(0.5)),
+                icon: Icon(Symbols.delete, color: Colors.redAccent.withValues(alpha: 0.5)),
                 onPressed: () => ref.read(subscriptionProvider.notifier).removeSubscription(subscription.id),
                 tooltip: 'Delete subscription',
               ),

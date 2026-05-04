@@ -34,6 +34,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
 
     final state = ref.read(authProvider);
+    if (!mounted) return;
     if (state.isAuthenticated) {
       context.go('/');
     } else if (state.error != null) {
@@ -55,9 +56,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppTheme.accentBlue.withOpacity(0.1),
+              AppTheme.accent.withValues(alpha: 0.1),
               Colors.black,
-              AppTheme.accentPurple.withOpacity(0.1),
+              AppTheme.accent.withValues(alpha: 0.05),
             ],
           ),
         ),
@@ -74,7 +75,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     Icon(
                       _isLogin ? Icons.lock_outline : Icons.person_add_outlined,
                       size: 64,
-                      color: AppTheme.accentBlue,
+                      color: AppTheme.accent,
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -92,7 +93,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         : 'Join ZShield for a better VPN experience',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 14,
                       ),
                     ),
@@ -115,8 +116,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     else
                       GlassButton(
                         onPressed: _handleSubmit,
-                        label: _isLogin ? 'Sign In' : 'Sign Up',
                         isPrimary: true,
+                        child: Text(_isLogin ? 'Sign In' : 'Sign Up'),
                       ),
                     const SizedBox(height: 16),
                     TextButton(
@@ -125,7 +126,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         _isLogin 
                           ? "Don't have an account? Sign Up" 
                           : "Already have an account? Sign In",
-                        style: TextStyle(color: AppTheme.accentBlue),
+                        style: TextStyle(color: AppTheme.accent),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -133,7 +134,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       onPressed: () => context.go('/'),
                       child: Text(
                         "Continue as Guest",
-                        style: TextStyle(color: Colors.white.withOpacity(0.4)),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
                       ),
                     ),
                   ],
@@ -154,9 +155,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: TextField(
         controller: controller,
@@ -164,8 +165,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-          prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.5)),
+          labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+          prefixIcon: Icon(icon, color: Colors.white.withValues(alpha: 0.5)),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),

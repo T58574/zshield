@@ -6,6 +6,7 @@ import 'core/secrets.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router.dart';
 import 'providers/config_provider.dart';
+import 'providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,11 +18,22 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   
+  final container = ProviderContainer(
+    overrides: [
+      sharedPreferencesProvider.overrideWithValue(prefs),
+    ],
+  );
+
+  // Trigger anonymous sign-in if not logged in
+  final auth = container.read(authProvider.notifier);
+  final authState = container.read(authProvider);
+  if (!authState.isAuthenticated) {
+    await auth.signInAnonymously();
+  }
+
   runApp(
-    ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: const ZShieldApp(),
     ),
   );
