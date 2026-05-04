@@ -11,10 +11,36 @@ class AppLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width <= 800;
+
     return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: isMobile
+          ? AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              centerTitle: true,
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Symbols.shield, size: 24, fill: 0, weight: 400),
+                  const SizedBox(width: 8),
+                  Text(
+                    'V-SHIELD',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                        ),
+                  ),
+                ],
+              ),
+            )
+          : null,
+      bottomNavigationBar: isMobile ? const _MobileNavBar() : null,
       body: Stack(
         children: [
-          // Background (could be a subtle gradient or abstract shapes)
+          // Background
           Positioned(
             top: -100,
             right: -100,
@@ -31,21 +57,122 @@ class AppLayout extends StatelessWidget {
             ),
           ),
           // Layout
-          Row(
-            children: [
-              // Sidebar Navigation
-              const _Sidebar(),
-              // Main Content
-              Expanded(
-                child: ClipRect(
-                  child: child.animate(key: ValueKey(GoRouterState.of(context).uri.toString()))
-                      .fadeIn(duration: 400.ms)
-                      .slideY(begin: 0.02, curve: Curves.easeOutCubic),
+          isMobile
+              ? SafeArea(
+                  child: ClipRect(
+                    child: child
+                        .animate(key: ValueKey(GoRouterState.of(context).uri.toString()))
+                        .fadeIn(duration: 400.ms)
+                        .slideY(begin: 0.02, curve: Curves.easeOutCubic),
+                  ),
+                )
+              : Row(
+                  children: [
+                    // Sidebar Navigation
+                    const _Sidebar(),
+                    // Main Content
+                    Expanded(
+                      child: ClipRect(
+                        child: child
+                            .animate(key: ValueKey(GoRouterState.of(context).uri.toString()))
+                            .fadeIn(duration: 400.ms)
+                            .slideY(begin: 0.02, curve: Curves.easeOutCubic),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ],
+      ),
+    );
+  }
+}
+
+class _MobileNavBar extends StatelessWidget {
+  const _MobileNavBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final currentRoute = GoRouterState.of(context).uri.toString();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.8),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+      ),
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _MobileNavItem(
+                    icon: Symbols.grid_view,
+                    isSelected: currentRoute == '/',
+                    onTap: () => context.go('/'),
+                  ),
+                  _MobileNavItem(
+                    icon: Symbols.dns,
+                    isSelected: currentRoute == '/servers',
+                    onTap: () => context.go('/servers'),
+                  ),
+                  _MobileNavItem(
+                    icon: Symbols.rss_feed,
+                    isSelected: currentRoute == '/subscriptions',
+                    onTap: () => context.go('/subscriptions'),
+                  ),
+                  _MobileNavItem(
+                    icon: Symbols.route,
+                    isSelected: currentRoute == '/routing',
+                    onTap: () => context.go('/routing'),
+                  ),
+                  _MobileNavItem(
+                    icon: Symbols.settings_input_component,
+                    isSelected: currentRoute == '/settings',
+                    onTap: () => context.go('/settings'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileNavItem extends StatelessWidget {
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _MobileNavItem({
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          icon,
+          color: isSelected ? AppTheme.accent : Colors.white.withValues(alpha: 0.4),
+          size: 24,
+        ),
       ),
     );
   }
@@ -161,6 +288,7 @@ class _Sidebar extends StatelessWidget {
     );
   }
 }
+
 
 class _NavItem extends StatelessWidget {
   final IconData icon;

@@ -15,19 +15,31 @@ class SubscriptionScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+    final isMobile = MediaQuery.of(context).size.width <= 900;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(40.0),
+        padding: EdgeInsets.all(isMobile ? 16.0 : 40.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (isMobile) const SizedBox(height: 40),
             // Header
-            Row(
+            Flex(
+              direction: isMobile ? Axis.vertical : Axis.horizontal,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: isMobile ? CrossAxisAlignment.start : CrossAxisAlignment.center,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Subscriptions', style: Theme.of(context).textTheme.displayLarge),
+                    Text(
+                      'Subscriptions', 
+                      style: isMobile 
+                        ? Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)
+                        : Theme.of(context).textTheme.displayLarge,
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       'Manage your external server sources.',
@@ -37,6 +49,7 @@ class SubscriptionScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+                if (isMobile) const SizedBox(height: 24),
                 ElevatedButton.icon(
                   onPressed: () => _showAddSubscriptionDialog(context, ref),
                   icon: const Icon(Symbols.add_link, size: 20),
@@ -44,7 +57,7 @@ class SubscriptionScreen extends ConsumerWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.accent,
                     foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                   ),
                 ),
@@ -73,7 +86,7 @@ class SubscriptionScreen extends ConsumerWidget {
                 separatorBuilder: (context, index) => const SizedBox(height: 16),
                 itemBuilder: (context, index) {
                   final sub = subscriptions[index];
-                  return _SubscriptionCard(subscription: sub);
+                  return _SubscriptionCard(subscription: sub, isMobile: isMobile);
                 },
               ),
           ],
@@ -130,8 +143,9 @@ class SubscriptionScreen extends ConsumerWidget {
 
 class _SubscriptionCard extends ConsumerWidget {
   final Subscription subscription;
+  final bool isMobile;
 
-  const _SubscriptionCard({required this.subscription});
+  const _SubscriptionCard({required this.subscription, this.isMobile = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -139,19 +153,21 @@ class _SubscriptionCard extends ConsumerWidget {
     final lastUpdatedStr = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
     return GlassPanel(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              shape: BoxShape.circle,
+          if (!isMobile) ...[
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Symbols.rss_feed, color: AppTheme.accent, size: 24),
             ),
-            child: const Icon(Symbols.rss_feed, color: AppTheme.accent, size: 24),
-          ),
-          const SizedBox(width: 24),
+            const SizedBox(width: 24),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,23 +185,24 @@ class _SubscriptionCard extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 16),
           Row(
             children: [
               IconButton(
-                icon: const Icon(Symbols.refresh, color: Colors.white54),
+                icon: const Icon(Symbols.refresh, color: Colors.white54, size: 20),
                 onPressed: () => ref.read(subscriptionProvider.notifier).fetchSubscription(subscription.id),
-                tooltip: 'Refresh servers',
+                tooltip: 'Refresh',
               ),
               IconButton(
-                icon: Icon(Symbols.delete, color: Colors.redAccent.withValues(alpha: 0.5)),
+                icon: Icon(Symbols.delete, color: Colors.redAccent.withValues(alpha: 0.5), size: 20),
                 onPressed: () => ref.read(subscriptionProvider.notifier).removeSubscription(subscription.id),
-                tooltip: 'Delete subscription',
+                tooltip: 'Delete',
               ),
             ],
           ),
         ],
       ),
     );
+
   }
 }

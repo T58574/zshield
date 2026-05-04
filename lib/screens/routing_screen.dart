@@ -76,22 +76,31 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
     final config = ref.watch(configProvider);
     final isProxy = config.isProxyMode;
 
+    final isMobile = MediaQuery.of(context).size.width <= 900;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(40.0),
+        padding: EdgeInsets.all(isMobile ? 16.0 : 40.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (isMobile) const SizedBox(height: 40),
             // Header
-            Row(
+            Flex(
+              direction: isMobile ? Axis.vertical : Axis.horizontal,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: isMobile ? CrossAxisAlignment.start : CrossAxisAlignment.center,
               children: [
                 Text(
                   'Routing (V-Shield)',
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: isMobile 
+                    ? Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)
+                    : Theme.of(context).textTheme.headlineMedium,
                 ),
+                if (isMobile) const SizedBox(height: 16),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     StatusGlow(
                       animate: true,
@@ -109,20 +118,22 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text('STATUS: PROTECTED', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white60, fontSize: 11)),
-                    const SizedBox(width: 24),
-                    const Icon(Symbols.notifications, color: Colors.white60),
-                    const SizedBox(width: 12),
-                    const Icon(Symbols.sensors, color: Colors.white60),
-                    const SizedBox(width: 12),
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white24),
+                    if (!isMobile) ...[
+                      const SizedBox(width: 24),
+                      const Icon(Symbols.notifications, color: Colors.white60),
+                      const SizedBox(width: 12),
+                      const Icon(Symbols.sensors, color: Colors.white60),
+                      const SizedBox(width: 12),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: const Icon(Symbols.person, size: 20, color: Colors.white),
                       ),
-                      child: const Icon(Symbols.person, size: 20, color: Colors.white),
-                    ),
+                    ],
                   ],
                 ),
               ],
@@ -131,7 +142,7 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
 
             // Mode Selection
             GlassPanel(
-              padding: const EdgeInsets.all(32),
+              padding: EdgeInsets.all(isMobile ? 20 : 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -139,30 +150,29 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
                     children: [
                       const Icon(Symbols.route, color: Colors.white54, size: 24),
                       const SizedBox(width: 12),
-                      Text('Режим работы (Operating Mode)', style: Theme.of(context).textTheme.titleSmall),
+                      Text('Режим работы', style: Theme.of(context).textTheme.titleSmall),
                     ],
                   ),
                   const SizedBox(height: 32),
-                  Row(
+                  Flex(
+                    direction: isMobile ? Axis.vertical : Axis.horizontal,
                     children: [
-                      Expanded(
-                        child: _ModeCard(
-                          title: 'Tunneling (System-wide)',
-                          description: 'Весь трафик системы проходит через защищенный туннель.',
-                          isSelected: !isProxy,
-                          onTap: () => ref.read(configProvider.notifier).setRoutingMode(false),
-                          icon: Symbols.vpn_lock,
-                        ),
+                      _ModeCard(
+                        title: 'Tunneling (System-wide)',
+                        description: 'Весь трафик системы проходит через защищенный туннель.',
+                        isSelected: !isProxy,
+                        onTap: () => ref.read(configProvider.notifier).setRoutingMode(false),
+                        icon: Symbols.vpn_lock,
+                        isMobile: isMobile,
                       ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        child: _ModeCard(
-                          title: 'Proxy (App-specific)',
-                          description: 'Только выбранные приложения проходят через прокси.',
-                          isSelected: isProxy,
-                          onTap: () => ref.read(configProvider.notifier).setRoutingMode(true),
-                          icon: Symbols.filter_alt,
-                        ),
+                      if (isMobile) const SizedBox(height: 16) else const SizedBox(width: 24),
+                      _ModeCard(
+                        title: 'Proxy (App-specific)',
+                        description: 'Только выбранные приложения проходят через прокси.',
+                        isSelected: isProxy,
+                        onTap: () => ref.read(configProvider.notifier).setRoutingMode(true),
+                        icon: Symbols.filter_alt,
+                        isMobile: isMobile,
                       ),
                     ],
                   ),
@@ -173,7 +183,7 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
 
             // Apps List
             GlassPanel(
-              padding: const EdgeInsets.all(32),
+              padding: EdgeInsets.all(isMobile ? 20 : 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -184,7 +194,7 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
                         children: [
                           const Icon(Symbols.apps, color: Colors.white54, size: 24),
                           const SizedBox(width: 12),
-                          Text('Активные приложения (Active Apps)', style: Theme.of(context).textTheme.titleSmall),
+                          Text(isMobile ? 'Активные прил.' : 'Активные приложения', style: Theme.of(context).textTheme.titleSmall),
                         ],
                       ),
                       IconButton(
@@ -196,7 +206,7 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Выберите приложения, которые должны использовать соединение. Приложения должны быть активны в системе.',
+                    'Выберите приложения, которые должны использовать соединение.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54),
                   ),
                   const SizedBox(height: 24),
@@ -220,7 +230,7 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
                       children: _runningApps.map((appName) {
                         final isRouted = config.routedApps.contains(appName);
                         return Container(
-                          width: 300,
+                          width: isMobile ? double.infinity : 300,
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.05),
@@ -260,6 +270,7 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
         ),
       ),
     );
+
   }
 }
 
@@ -269,6 +280,7 @@ class _ModeCard extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final IconData icon;
+  final bool isMobile;
 
   const _ModeCard({
     required this.title,
@@ -276,6 +288,7 @@ class _ModeCard extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     required this.icon,
+    this.isMobile = false,
   });
 
   @override
@@ -285,7 +298,7 @@ class _ModeCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.accent.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.02),
           borderRadius: BorderRadius.circular(16),
@@ -308,15 +321,15 @@ class _ModeCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(icon, color: isSelected ? Colors.white : Colors.white54, size: 32),
+                Icon(icon, color: isSelected ? Colors.white : Colors.white54, size: isMobile ? 24 : 32),
                 if (isSelected)
-                  const Icon(Symbols.check_circle, color: Colors.white, size: 24),
+                  Icon(Symbols.check_circle, color: Colors.white, size: isMobile ? 20 : 24),
               ],
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: isMobile ? 16 : 24),
             Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: (isMobile ? Theme.of(context).textTheme.titleSmall : Theme.of(context).textTheme.titleMedium)?.copyWith(
                 color: isSelected ? Colors.white : Colors.white70,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
@@ -326,6 +339,7 @@ class _ModeCard extends StatelessWidget {
               description,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Colors.white54,
+                fontSize: isMobile ? 10 : 12,
               ),
             ),
           ],
@@ -334,3 +348,4 @@ class _ModeCard extends StatelessWidget {
     );
   }
 }
+

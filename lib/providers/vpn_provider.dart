@@ -41,7 +41,13 @@ class VpnNotifier extends Notifier<VpnState> {
   @override
   VpnState build() {
     _xrayService.onExit = (code) {
-      if (code != 0 && code != -1 && state.connectionState != VpnConnectionState.disconnected) {
+      if (code == -2 && state.connectionState != VpnConnectionState.disconnected) {
+        state = state.copyWith(
+          connectionState: VpnConnectionState.error, 
+          errorMessage: 'Ошибка: Запустите программу от имени Администратора для работы TUN (Tunnel) режима'
+        );
+        ref.read(trafficProvider.notifier).stopTracking();
+      } else if (code != 0 && code != -1 && state.connectionState != VpnConnectionState.disconnected) {
         state = state.copyWith(
           connectionState: VpnConnectionState.error, 
           errorMessage: 'Xray process exited unexpectedly (code: $code)'

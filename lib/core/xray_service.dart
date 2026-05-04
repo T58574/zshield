@@ -9,6 +9,8 @@ class XrayService {
   Process? _xrayProcess;
   bool _isRunning = false;
   bool _proxyEnabled = false;
+  bool _tunEnabled = false;
+  Process? _singBoxProcess;
   String? _cachedXrayPath;
   Function(int)? onExit;
 
@@ -76,6 +78,34 @@ class XrayService {
     return xrayPath;
   }
 
+  Future<void> _extractSingBox() async {
+    if (!Platform.isWindows) return;
+    final docDir = await getApplicationSupportDirectory();
+    final separator = Platform.pathSeparator;
+    
+    final sbPath = '${docDir.path}${separator}sing-box.exe';
+    final fileSb = File(sbPath);
+    if (!await fileSb.exists()) {
+      try {
+        final byteData = await rootBundle.load('assets/core/sing-box.exe');
+        await fileSb.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+      } catch (e) {
+        debugPrint("Warning: sing-box.exe not found in assets.");
+      }
+    }
+    
+    final wintunPath = '${docDir.path}${separator}wintun.dll';
+    final fileWintun = File(wintunPath);
+    if (!await fileWintun.exists()) {
+      try {
+        final byteData = await rootBundle.load('assets/core/wintun.dll');
+        await fileWintun.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+      } catch (e) {
+        debugPrint("Warning: wintun.dll not found in assets.");
+      }
+    }
+  }
+
   Future<List<int>> _getAvailablePorts(int count) async {
     List<ServerSocket> sockets = [];
     List<int> ports = [];
@@ -126,6 +156,50 @@ class XrayService {
       if (configState.isProxyMode) {
         await _setSystemProxy(true);
         _proxyEnabled = true;
+      } else {
+        if (Platform.isWindows) {
+          await _extractSingBox();
+          final sbConfigPath = '${docDir.path}${Platform.pathSeparator}sb_tun.json';
+          final sbConfig = {
+            "log": {"level": "fatal"},
+            "inbounds": [
+              {
+                "type": "tun",
+                "tag": "tun-in",
+                "interface_name": "zshield",
+                "inet4_address": "172.19.0.1/30",
+                "auto_route": true,
+                "strict_route": true,
+                "stack": "system",
+                "sniff": true
+              }
+            ],
+            "outbounds": [
+              {
+                "type": "socks",
+                "tag": "socks-out",
+                "server": "127.0.0.1",
+                "server_port": _socksPort
+              }
+            ]
+          };
+          await File(sbConfigPath).writeAsString(jsonEncode(sbConfig));
+          
+          try {
+            _singBoxProcess = await Process.start('${docDir.path}${Platform.pathSeparator}sing-box.exe', ['run', '-c', sbConfigPath]);
+            _tunEnabled = true;
+            
+            _singBoxProcess?.exitCode.then((code) {
+              if (code != 0 && _tunEnabled && _isRunning) {
+                // If it exits immediately, likely admin rights missing
+                stop(); // Ensure we don't leave Xray running without tunnel
+                onExit?.call(-2); 
+              }
+            });
+          } catch (e) {
+            debugPrint("Failed to start sing-box: $e");
+          }
+        }
       }
 
       _xrayProcess = await Process.start(xrayPath, ['run', '-c', configPath]);
@@ -144,6 +218,10 @@ class XrayService {
           _setSystemProxy(false);
           _proxyEnabled = false;
         }
+        if (_tunEnabled) {
+          _singBoxProcess?.kill();
+          _tunEnabled = false;
+        }
         onExit?.call(code);
       });
     } catch (e) {
@@ -151,6 +229,10 @@ class XrayService {
       if (_proxyEnabled) {
         await _setSystemProxy(false);
         _proxyEnabled = false;
+      }
+      if (_tunEnabled) {
+        _singBoxProcess?.kill();
+        _tunEnabled = false;
       }
       rethrow;
     }
@@ -162,6 +244,11 @@ class XrayService {
     if (_proxyEnabled) {
       await _setSystemProxy(false);
       _proxyEnabled = false;
+    }
+    
+    if (_tunEnabled) {
+      _singBoxProcess?.kill();
+      _tunEnabled = false;
     }
     
     // Graceful shutdown: try SIGTERM first, then force kill after timeout

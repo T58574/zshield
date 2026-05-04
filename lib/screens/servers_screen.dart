@@ -17,21 +17,31 @@ class ServersScreen extends ConsumerWidget {
     final config = ref.watch(configProvider);
     final selectedId = config.selectedServerId;
 
+    final isMobile = MediaQuery.of(context).size.width <= 900;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(40.0),
+        padding: EdgeInsets.all(isMobile ? 16.0 : 40.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (isMobile) const SizedBox(height: 40),
             // Header
-            Row(
+            Flex(
+              direction: isMobile ? Axis.vertical : Axis.horizontal,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: isMobile ? CrossAxisAlignment.start : CrossAxisAlignment.center,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Servers', style: Theme.of(context).textTheme.displayLarge),
+                    Text(
+                      'Servers', 
+                      style: isMobile 
+                        ? Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)
+                        : Theme.of(context).textTheme.displayLarge,
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       'Manage your connection nodes.',
@@ -41,7 +51,9 @@ class ServersScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+                if (isMobile) const SizedBox(height: 24),
                 Row(
+                  mainAxisAlignment: isMobile ? MainAxisAlignment.spaceBetween : MainAxisAlignment.end,
                   children: [
                     IconButton(
                       icon: const Icon(Symbols.bolt, color: AppTheme.accent),
@@ -56,7 +68,7 @@ class ServersScreen extends ConsumerWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.accent,
                         foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                       ),
                     ),
@@ -83,11 +95,11 @@ class ServersScreen extends ConsumerWidget {
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: isMobile ? 1 : 3,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  childAspectRatio: 1.4,
+                  childAspectRatio: isMobile ? 2.5 : 1.4,
                 ),
                 itemCount: servers.length,
                 itemBuilder: (context, index) {
@@ -106,6 +118,7 @@ class ServersScreen extends ConsumerWidget {
         ),
       ),
     );
+
   }
 
   Future<void> _pingAllServers(WidgetRef ref, List<Server> servers) async {

@@ -104,15 +104,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       validUntil = 'Неверный формат ссылки';
     }
 
+    final isMobile = MediaQuery.of(context).size.width <= 900;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(40.0),
+        padding: EdgeInsets.all(isMobile ? 16.0 : 40.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
+            if (isMobile) const SizedBox(height: 40), // Spacer for AppBar
+            Flex(
+              direction: isMobile ? Axis.vertical : Axis.horizontal,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: isMobile ? CrossAxisAlignment.start : CrossAxisAlignment.center,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,7 +126,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       children: [
                         Text(
                           'Dashboard',
-                          style: Theme.of(context).textTheme.displayLarge,
+                          style: isMobile 
+                            ? Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)
+                            : Theme.of(context).textTheme.displayLarge,
                         ),
                         const SizedBox(width: 16),
                         if (ref.watch(authProvider).isPremium)
@@ -160,80 +167,111 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   ],
                 ).animate().fadeIn(duration: 600.ms).slideX(begin: -0.1),
+                if (isMobile) const SizedBox(height: 24),
                 Row(
+                  mainAxisAlignment: isMobile ? MainAxisAlignment.spaceBetween : MainAxisAlignment.end,
                   children: [
-                    IconButton(
-                      onPressed: () {
-                        if (ref.read(authProvider).isAuthenticated) {
-                          // Show profile / sign out
-                          _showProfileDialog(context, ref);
-                        } else {
-                          context.push('/auth');
-                        }
-                      },
-                      icon: Icon(
-                        ref.watch(authProvider).isAuthenticated 
-                          ? Icons.person_outline 
-                          : Icons.login_outlined,
-                        color: Colors.white.withValues(alpha: 0.6),
-                      ),
-                      tooltip: ref.watch(authProvider).isAuthenticated ? 'Profile' : 'Sign In',
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            if (ref.read(authProvider).isAuthenticated) {
+                              // Show profile / sign out
+                              _showProfileDialog(context, ref);
+                            } else {
+                              context.push('/auth');
+                            }
+                          },
+                          icon: Icon(
+                            ref.watch(authProvider).isAuthenticated 
+                              ? Icons.person_outline 
+                              : Icons.login_outlined,
+                            color: Colors.white.withValues(alpha: 0.6),
+                          ),
+                          tooltip: ref.watch(authProvider).isAuthenticated ? 'Profile' : 'Sign In',
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () {
+                            configNotifier.setRoutingMode(!configState.isProxyMode);
+                          },
+                          child: GlassPanel(
+                            padding: const EdgeInsets.all(4),
+                            borderRadius: BorderRadius.circular(30),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: !configState.isProxyMode ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  child: Text('TUNNEL', style: TextStyle(color: !configState.isProxyMode ? Colors.black : Colors.white.withValues(alpha: 0.4), fontSize: 10, fontWeight: FontWeight.bold)),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: configState.isProxyMode ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  child: Text('PROXY', style: TextStyle(color: configState.isProxyMode ? Colors.black : Colors.white.withValues(alpha: 0.4), fontSize: 10, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        configNotifier.setRoutingMode(!configState.isProxyMode);
-                      },
-                      child: GlassPanel(
-                        padding: const EdgeInsets.all(4),
+                    if (!isMobile) const SizedBox(width: 16),
+                    if (!isMobile)
+                      GlassPanel(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         borderRadius: BorderRadius.circular(30),
                         child: Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: !configState.isProxyMode ? Colors.white : Colors.transparent,
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              child: Text('TUNNEL', style: TextStyle(color: !configState.isProxyMode ? Colors.black : Colors.white.withValues(alpha: 0.4), fontSize: 11, fontWeight: FontWeight.bold)),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: configState.isProxyMode ? Colors.white : Colors.transparent,
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              child: Text('PROXY', style: TextStyle(color: configState.isProxyMode ? Colors.black : Colors.white.withValues(alpha: 0.4), fontSize: 11, fontWeight: FontWeight.bold)),
+                            Icon(Symbols.sensors, color: Colors.white.withValues(alpha: 0.6), size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              vpnState.serverName ?? 'No Server Selected',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.6)),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    GlassPanel(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      borderRadius: BorderRadius.circular(30),
-                      child: Row(
-                        children: [
-                          Icon(Symbols.sensors, color: Colors.white.withValues(alpha: 0.6), size: 16),
-                          const SizedBox(width: 8),
-                          Text(
-                            vpnState.serverName ?? 'No Server Selected',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.6)),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ).animate().fadeIn(duration: 600.ms, delay: 100.ms).slideX(begin: 0.1),
               ],
             ),
             const SizedBox(height: 40),
 
-            Row(
+            if (isMobile)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: GlassPanel(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  borderRadius: BorderRadius.circular(30),
+                  child: Row(
+                    children: [
+                      Icon(Symbols.sensors, color: Colors.white.withValues(alpha: 0.6), size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          vpnState.serverName ?? 'No Server Selected',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.6)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            Flex(
+              direction: isMobile ? Axis.vertical : Axis.horizontal,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
+                  flex: isMobile ? 0 : 1,
                   child: GlassPanel(
                     highIntensity: true,
                     padding: const EdgeInsets.all(24),
@@ -270,7 +308,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           children: [
                             const Icon(Symbols.event_available, size: 14, color: Colors.white54),
                             const SizedBox(width: 8),
-                            Text('Ссылка действует до: $validUntil', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12, color: Colors.white70)),
+                            Flexible(
+                              child: Text(
+                                'Ссылка действует до: $validUntil', 
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12, color: Colors.white70),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -315,15 +359,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   ),
                 ).animate().fadeIn(duration: 600.ms, delay: 200.ms).scale(begin: const Offset(0.95, 0.95)),
-                const SizedBox(width: 16),
+                if (isMobile) const SizedBox(height: 16) else const SizedBox(width: 16),
                 Expanded(
+                  flex: isMobile ? 0 : 1,
                   child: GridView.count(
-                    crossAxisCount: 2,
+                    crossAxisCount: isMobile ? 1 : 2,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    childAspectRatio: 1.5,
+                    childAspectRatio: isMobile ? 2.5 : 1.5,
                     children: [
                       _buildStatCard(context, 'Public Gateway', Symbols.public, vpnState.serverName ?? 'OFFLINE', 'ISP: DIRECT CONNECTION'),
                       _buildStatCard(context, 'Traffic (Session)', Symbols.data_usage, tValue, tUnit, isProgress: isConnected),
@@ -336,21 +381,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
             const SizedBox(height: 40),
             
-            Row(
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
               children: [
-                _buildFooterStat(context, 'UPSTREAM', isConnected ? '$upSpeedStr/s' : '0.0 B/s', Symbols.speed),
-                const SizedBox(width: 16),
-                _buildFooterStat(context, 'DOWNSTREAM', isConnected ? '$downSpeedStr/s' : '0.0 B/s', Symbols.download),
-                const SizedBox(width: 16),
-                _buildFooterStat(context, 'LATENCY', isConnected ? '— ms' : '-- ms', Symbols.timer),
-                const SizedBox(width: 16),
-                _buildFooterStat(context, 'ENCRYPTION', isConnected ? 'AES-256-GCM' : 'DISABLED', null, showDot: true),
+                _buildFooterStat(context, 'UPSTREAM', isConnected ? '$upSpeedStr/s' : '0.0 B/s', Symbols.speed, isMobile: isMobile),
+                _buildFooterStat(context, 'DOWNSTREAM', isConnected ? '$downSpeedStr/s' : '0.0 B/s', Symbols.download, isMobile: isMobile),
+                _buildFooterStat(context, 'LATENCY', isConnected ? '— ms' : '-- ms', Symbols.timer, isMobile: isMobile),
+                _buildFooterStat(context, 'ENCRYPTION', isConnected ? 'AES-256-GCM' : 'DISABLED', null, showDot: true, isMobile: isMobile),
               ],
             ).animate().fadeIn(duration: 600.ms, delay: 400.ms).slideY(begin: 0.1),
           ],
         ),
       ),
     );
+
   }
 
   Widget _buildStatCard(BuildContext context, String title, IconData icon, String value, String subtitle, {bool isProgress = false}) {
@@ -448,39 +493,49 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildFooterStat(BuildContext context, String title, String value, IconData? icon, {bool showDot = false}) {
-    return Expanded(
-      child: GlassPanel(
-        padding: const EdgeInsets.all(24),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Center(
-                child: showDot
-                    ? Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle))
-                    : Icon(icon, color: Colors.white54, size: 20),
-              ),
+  Widget _buildFooterStat(BuildContext context, String title, String value, IconData? icon, {bool showDot = false, bool isMobile = false}) {
+    final content = GlassPanel(
+      padding: EdgeInsets.all(isMobile ? 12 : 24),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: isMobile ? 32 : 40,
+            height: isMobile ? 32 : 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white12),
             ),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.labelSmall),
-                const SizedBox(height: 4),
-                Text(value, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white)),
-              ],
+            child: Center(
+              child: showDot
+                  ? Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle))
+                  : Icon(icon, color: Colors.white54, size: isMobile ? 16 : 20),
             ),
-          ],
-        ),
+          ),
+          SizedBox(width: isMobile ? 10 : 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: isMobile ? 9 : 11)),
+              const SizedBox(height: 4),
+              Text(value, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white, fontSize: isMobile ? 11 : 13)),
+            ],
+          ),
+        ],
       ),
     );
+
+    if (isMobile) {
+      return SizedBox(
+        width: (MediaQuery.of(context).size.width - 48) / 2, // 2 items per row with 16 spacing
+        child: content,
+      );
+    }
+
+    return Expanded(child: content);
   }
+
   
   void _showProfileDialog(BuildContext context, WidgetRef ref) {
     final authState = ref.read(authProvider);
