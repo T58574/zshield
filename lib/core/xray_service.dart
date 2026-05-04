@@ -129,37 +129,45 @@ class XrayService {
       
       // 1. Cleanup previous orphaned instance using PID file
       final docDir = await getApplicationSupportDirectory();
-      final pidFile = File('${docDir.path}${Platform.pathSeparator}xray_pid.txt');
-      if (await pidFile.exists()) {
-        try {
-          final oldPidStr = await pidFile.readAsString();
-          final oldPid = int.tryParse(oldPidStr);
-          if (oldPid != null) {
-            if (Platform.isWindows) {
-              await Process.run('taskkill', ['/F', '/PID', oldPid.toString()]);
-            } else {
-              await Process.run('kill', ['-9', oldPid.toString()]);
+      final xrayPidFile = File('${docDir.path}${Platform.pathSeparator}xray_pid.txt');
+      final sbPidFile = File('${docDir.path}${Platform.pathSeparator}sb_pid.txt');
+      
+      for (var file in [xrayPidFile, sbPidFile]) {
+        if (await file.exists()) {
+          try {
+            final oldPidStr = await file.readAsString();
+            final oldPid = int.tryParse(oldPidStr);
+            if (oldPid != null) {
+              if (Platform.isWindows) {
+                await Process.run('taskkill', ['/F', '/PID', oldPid.toString()]);
+              } else {
+                await Process.run('kill', ['-9', oldPid.toString()]);
+              }
             }
-          }
-        } catch (_) {} // Ignore errors if process doesn't exist
+          } catch (_) {}
+        }
       }
 
-      // 2. Allocate dynamic ports to avoid "address already in use" errors
-      final ports = await _getAvailablePorts(3);
-      _apiPort = ports[0];
-      _socksPort = ports[1];
-      _httpPort = ports[2];
+      // 2. Use fixed ports for predictability, but check if they are available
+      _apiPort = 10085;
+      _socksPort = 10808;
+      _httpPort = 10809;
 
       final configJson = _generateConfig(configState);
       await File(configPath).writeAsString(configJson);
 
-      if (configState.isProxyMode) {
+      if (configState.isProxyMode && configState.routedApps.isEmpty) {
+        // System-wide proxy mode (only if no specific apps selected)
         await _setSystemProxy(true);
         _proxyEnabled = true;
       } else {
+        // Tunnel mode OR App-specific proxy mode
         if (Platform.isWindows) {
           await _extractSingBox();
           final sbConfigPath = '${docDir.path}${Platform.pathSeparator}sb_tun.json';
+          
+          final List<String> includeProcesses = configState.routedApps;
+          
           final sbConfig = {
             "log": {"level": "fatal"},
             "inbounds": [
@@ -171,7 +179,8 @@ class XrayService {
                 "auto_route": true,
                 "strict_route": true,
                 "stack": "system",
-                "sniff": true
+                "sniff": true,
+                if (includeProcesses.isNotEmpty) "include_process": includeProcesses,
               }
             ],
             "outbounds": [
@@ -189,10 +198,13 @@ class XrayService {
             _singBoxProcess = await Process.start('${docDir.path}${Platform.pathSeparator}sing-box.exe', ['run', '-c', sbConfigPath]);
             _tunEnabled = true;
             
+            // Save sing-box PID
+            await sbPidFile.writeAsString(_singBoxProcess!.pid.toString());
+            
             _singBoxProcess?.exitCode.then((code) {
               if (code != 0 && _tunEnabled && _isRunning) {
-                // If it exits immediately, likely admin rights missing
-                stop(); // Ensure we don't leave Xray running without tunnel
+                // If it exits immediately, likely admin rights missing or port conflict
+                stop(); 
                 onExit?.call(-2); 
               }
             });
@@ -206,7 +218,7 @@ class XrayService {
       _isRunning = true;
       
       // Save new PID for future cleanup
-      await pidFile.writeAsString(_xrayProcess!.pid.toString());
+      await xrayPidFile.writeAsString(_xrayProcess!.pid.toString());
       
       _xrayProcess?.stdout.transform(utf8.decoder).listen((data) => debugPrint("XRAY STDOUT: $data"));
       _xrayProcess?.stderr.transform(utf8.decoder).listen((data) => debugPrint("XRAY STDERR: $data"));
