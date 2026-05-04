@@ -35,6 +35,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  @override
+  Widget build(BuildContext context) {
+    final config = ref.watch(configProvider);
+    final notifier = ref.read(configProvider.notifier);
     final isMobile = MediaQuery.of(context).size.width <= 900;
 
     return Scaffold(
@@ -103,7 +107,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Flex(
                 direction: isMobile ? Axis.vertical : Axis.horizontal,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween, 
-                crossAxisAlignment: isMobile ? CrossAxisAlignment.start : WrapCrossAlignment.center,
+                crossAxisAlignment: isMobile ? CrossAxisAlignment.start : CrossAxisAlignment.center,
                 children: [
                   Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center, 
@@ -135,8 +139,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
-
   }
+
 
   Widget _buildDivider() => Container(width: 1, height: 40, color: Colors.white.withValues(alpha: 0.1), margin: const EdgeInsets.symmetric(horizontal: 24));
 

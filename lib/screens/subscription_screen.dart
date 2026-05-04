@@ -12,9 +12,6 @@ class SubscriptionScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final subscriptions = ref.watch(subscriptionProvider);
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
     final isMobile = MediaQuery.of(context).size.width <= 900;
 
     return Scaffold(
