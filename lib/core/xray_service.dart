@@ -12,13 +12,17 @@ class XrayService {
   String? _cachedXrayPath;
   Function(int)? onExit;
 
+  int _apiPort = 10085;
+  int _socksPort = 10808;
+  int _httpPort = 10809;
+
   bool get isRunning => _isRunning;
 
   Future<Map<String, int>> getTrafficStats() async {
     if (!_isRunning) return {'uplink': 0, 'downlink': 0};
     try {
       final xrayPath = await _extractXray();
-      final result = await Process.run(xrayPath, ['api', 'statsquery', '--server=127.0.0.1:10085']);
+      final result = await Process.run(xrayPath, ['api', 'statsquery', '--server=127.0.0.1:$_apiPort']);
       if (result.exitCode == 0) {
         int uplink = 0;
         int downlink = 0;
@@ -72,6 +76,20 @@ class XrayService {
     return xrayPath;
   }
 
+  Future<List<int>> _getAvailablePorts(int count) async {
+    List<ServerSocket> sockets = [];
+    List<int> ports = [];
+    for (int i = 0; i < count; i++) {
+      final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      sockets.add(socket);
+      ports.add(socket.port);
+    }
+    for (var socket in sockets) {
+      await socket.close();
+    }
+    return ports;
+  }
+
   Future<void> start(ConfigState configState) async {
     if (_isRunning) return;
 
@@ -79,6 +97,29 @@ class XrayService {
       final xrayPath = await _extractXray();
       final configPath = '${File(xrayPath).parent.path}${Platform.pathSeparator}config.json';
       
+      // 1. Cleanup previous orphaned instance using PID file
+      final docDir = await getApplicationSupportDirectory();
+      final pidFile = File('${docDir.path}${Platform.pathSeparator}xray_pid.txt');
+      if (await pidFile.exists()) {
+        try {
+          final oldPidStr = await pidFile.readAsString();
+          final oldPid = int.tryParse(oldPidStr);
+          if (oldPid != null) {
+            if (Platform.isWindows) {
+              await Process.run('taskkill', ['/F', '/PID', oldPid.toString()]);
+            } else {
+              await Process.run('kill', ['-9', oldPid.toString()]);
+            }
+          }
+        } catch (_) {} // Ignore errors if process doesn't exist
+      }
+
+      // 2. Allocate dynamic ports to avoid "address already in use" errors
+      final ports = await _getAvailablePorts(3);
+      _apiPort = ports[0];
+      _socksPort = ports[1];
+      _httpPort = ports[2];
+
       final configJson = _generateConfig(configState);
       await File(configPath).writeAsString(configJson);
 
@@ -89,6 +130,9 @@ class XrayService {
 
       _xrayProcess = await Process.start(xrayPath, ['run', '-c', configPath]);
       _isRunning = true;
+      
+      // Save new PID for future cleanup
+      await pidFile.writeAsString(_xrayProcess!.pid.toString());
       
       _xrayProcess?.stdout.transform(utf8.decoder).listen((data) => debugPrint("XRAY STDOUT: $data"));
       _xrayProcess?.stderr.transform(utf8.decoder).listen((data) => debugPrint("XRAY STDERR: $data"));
@@ -142,7 +186,7 @@ class XrayService {
     
     if (enable) {
       await Process.run('reg', ['add', r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings', '/v', 'ProxyEnable', '/t', 'REG_DWORD', '/d', '1', '/f']);
-      await Process.run('reg', ['add', r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings', '/v', 'ProxyServer', '/t', 'REG_SZ', '/d', '127.0.0.1:10809', '/f']);
+      await Process.run('reg', ['add', r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings', '/v', 'ProxyServer', '/t', 'REG_SZ', '/d', '127.0.0.1:$_httpPort', '/f']);
     } else {
       await Process.run('reg', ['add', r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings', '/v', 'ProxyEnable', '/t', 'REG_DWORD', '/d', '0', '/f']);
     }
@@ -193,7 +237,7 @@ class XrayService {
     // In "tunnel" mode, the same SOCKS+HTTP inbounds are used (TUN requires external tun2socks).
     final List<Map<String, dynamic>> inbounds = [
       {
-        "port": 10808,
+        "port": _socksPort,
         "listen": "127.0.0.1",
         "protocol": "socks",
         "settings": {
@@ -206,7 +250,7 @@ class XrayService {
         }
       },
       {
-        "port": 10809,
+        "port": _httpPort,
         "listen": "127.0.0.1",
         "protocol": "http",
         "settings": {
@@ -217,7 +261,7 @@ class XrayService {
 
     // Stats API inbound
     inbounds.add({
-      "port": 10085,
+      "port": _apiPort,
       "listen": "127.0.0.1",
       "protocol": "dokodemo-door",
       "settings": {
@@ -283,16 +327,11 @@ class XrayService {
       });
     }
 
-    if (configState.isProxyMode && configState.routedApps.isNotEmpty) {
-      rules.add({
-        "type": "field",
-        "process": configState.routedApps,
-        "outboundTag": "proxy"
-      });
+    if (configState.isProxyMode) {
       rules.add({
         "type": "field",
         "network": "tcp,udp",
-        "outboundTag": "direct"
+        "outboundTag": "proxy"
       });
     }
 
