@@ -106,20 +106,6 @@ class XrayService {
     }
   }
 
-  Future<List<int>> _getAvailablePorts(int count) async {
-    List<ServerSocket> sockets = [];
-    List<int> ports = [];
-    for (int i = 0; i < count; i++) {
-      final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
-      sockets.add(socket);
-      ports.add(socket.port);
-    }
-    for (var socket in sockets) {
-      await socket.close();
-    }
-    return ports;
-  }
-
   Future<void> start(ConfigState configState) async {
     if (_isRunning) return;
 
