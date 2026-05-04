@@ -22,7 +22,7 @@ class GlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveRadius = borderRadius ?? BorderRadius.circular(12.0); // Default to roughly rounded-xl
+    final effectiveRadius = borderRadius ?? BorderRadius.circular(12.0);
 
     return ClipRRect(
       borderRadius: effectiveRadius,
@@ -31,10 +31,10 @@ class GlassPanel extends StatelessWidget {
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(opacity),
+            color: Colors.white.withValues(alpha: opacity),
             borderRadius: effectiveRadius,
             border: Border.all(
-              color: Colors.white.withOpacity(borderOpacity),
+              color: Colors.white.withValues(alpha: borderOpacity),
               width: 1.0,
             ),
           ),

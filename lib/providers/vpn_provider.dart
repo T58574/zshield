@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/xray_service.dart';
+import 'config_provider.dart';
+import 'traffic_provider.dart';
+import 'server_provider.dart';
 
 enum VpnConnectionState { disconnected, connecting, connected, error }
 
@@ -19,12 +22,13 @@ class VpnState {
   VpnState copyWith({
     VpnConnectionState? connectionState,
     String? errorMessage,
+    bool clearError = false,
     String? serverName,
     DateTime? connectedAt,
   }) {
     return VpnState(
       connectionState: connectionState ?? this.connectionState,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       serverName: serverName ?? this.serverName,
       connectedAt: connectedAt ?? this.connectedAt,
     );
@@ -36,7 +40,34 @@ class VpnNotifier extends Notifier<VpnState> {
 
   @override
   VpnState build() {
+    _xrayService.onExit = (code) {
+      if (code != 0 && code != -1 && state.connectionState != VpnConnectionState.disconnected) {
+        state = state.copyWith(
+          connectionState: VpnConnectionState.error, 
+          errorMessage: 'Xray process exited unexpectedly (code: $code)'
+        );
+        ref.read(trafficProvider.notifier).stopTracking();
+      } else if (state.connectionState != VpnConnectionState.disconnected) {
+        state = state.copyWith(connectionState: VpnConnectionState.disconnected, clearError: true);
+        ref.read(trafficProvider.notifier).stopTracking();
+      }
+    };
     return const VpnState();
+  }
+
+  /// Validates the VLESS link format before attempting connection.
+  String? _validateVlessLink(String link) {
+    if (link.isEmpty) return 'VLESS ссылка не задана';
+    if (!link.startsWith('vless://')) return 'Неверный формат: ссылка должна начинаться с vless://';
+    try {
+      final uri = Uri.parse(link);
+      if (uri.host.isEmpty) return 'Неверный адрес сервера';
+      if (uri.port == 0) return 'Не указан порт сервера';
+      if (uri.userInfo.isEmpty) return 'Не указан UUID пользователя';
+    } catch (_) {
+      return 'Не удалось распарсить VLESS ссылку';
+    }
+    return null; // Valid
   }
 
   Future<void> connect(ConfigState configState) async {
@@ -45,25 +76,59 @@ class VpnNotifier extends Notifier<VpnState> {
       return;
     }
 
-    state = state.copyWith(connectionState: VpnConnectionState.connecting);
+    // Determine which link to use
+    String linkToUse = configState.vlessLink;
+    String sName = "Unknown Server";
+
+    if (configState.selectedServerId != null) {
+      final servers = ref.read(serverListProvider);
+      final selectedServer = servers.cast<Server?>().firstWhere(
+        (s) => s?.id == configState.selectedServerId, 
+        orElse: () => null
+      );
+      if (selectedServer != null) {
+        linkToUse = selectedServer.link;
+        sName = selectedServer.name;
+      }
+    }
+
+    // Validate link
+    final validationError = _validateVlessLink(linkToUse);
+    if (validationError != null) {
+      state = state.copyWith(
+        connectionState: VpnConnectionState.error,
+        errorMessage: validationError,
+      );
+      return;
+    }
+
+    state = state.copyWith(connectionState: VpnConnectionState.connecting, clearError: true);
 
     try {
-      String sName = "Unknown Server";
-      try {
-        final uri = Uri.parse(configState.vlessLink);
-        if (uri.fragment.isNotEmpty) {
-          sName = Uri.decodeComponent(uri.fragment);
-        } else {
-          sName = uri.host;
-        }
-      } catch (_) {}
+      if (sName == "Unknown Server") {
+        try {
+          final uri = Uri.parse(linkToUse);
+          if (uri.fragment.isNotEmpty) {
+            sName = Uri.decodeComponent(uri.fragment);
+          } else {
+            sName = uri.host;
+          }
+        } catch (_) {}
+      }
 
-      await _xrayService.start(configState);
+      // We need to pass the actual link to use to the xray service
+      // The xray service uses configState, so we might need to temporary override it
+      // or update XrayService to take a link directly.
+      // Let's update configState temporarily for the start call or pass a modified state.
+      final effectiveConfig = configState.copyWith(vlessLink: linkToUse);
+      await _xrayService.start(effectiveConfig);
       state = state.copyWith(
         connectionState: VpnConnectionState.connected,
         serverName: sName,
         connectedAt: DateTime.now(),
+        clearError: true,
       );
+      ref.read(trafficProvider.notifier).startTracking(_xrayService);
     } catch (e) {
       state = state.copyWith(
           connectionState: VpnConnectionState.error, errorMessage: e.toString());
@@ -71,8 +136,9 @@ class VpnNotifier extends Notifier<VpnState> {
   }
 
   Future<void> disconnect() async {
+    ref.read(trafficProvider.notifier).stopTracking();
     await _xrayService.stop();
-    state = state.copyWith(connectionState: VpnConnectionState.disconnected);
+    state = state.copyWith(connectionState: VpnConnectionState.disconnected, clearError: true);
   }
 }
 

@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -23,7 +25,7 @@ class AppLayout extends StatelessWidget {
                 width: 600,
                 height: 600,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -37,7 +39,9 @@ class AppLayout extends StatelessWidget {
               // Main Content
               Expanded(
                 child: ClipRect(
-                  child: child,
+                  child: child.animate(key: ValueKey(GoRouterState.of(context).uri.toString()))
+                      .fadeIn(duration: 400.ms)
+                      .slideY(begin: 0.02, curve: Curves.easeOutCubic),
                 ),
               ),
             ],
@@ -56,16 +60,16 @@ class _Sidebar extends StatelessWidget {
     final currentRoute = GoRouterState.of(context).uri.toString();
 
     return Container(
-      width: 256, // 64 rem = 256px
+      width: 256,
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.4),
+        color: Colors.black.withValues(alpha: 0.4),
         border: Border(
-          right: BorderSide(color: Colors.white.withOpacity(0.1)),
+          right: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
       ),
       child: ClipRect(
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40), // Backdrop blur
+          filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -92,12 +96,12 @@ class _Sidebar extends StatelessWidget {
                     Text(
                       'Protocol: VLESS',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Colors.white.withOpacity(0.4),
+                            color: Colors.white.withValues(alpha: 0.4),
                           ),
                     ),
                   ],
                 ),
-              ),
+              ).animate().fadeIn(duration: 600.ms).slideX(begin: -0.2),
               // Navigation Items
               Expanded(
                 child: ListView(
@@ -108,19 +112,31 @@ class _Sidebar extends StatelessWidget {
                       label: 'Dashboard',
                       isSelected: currentRoute == '/',
                       onTap: () => context.go('/'),
-                    ),
+                    ).animate().fadeIn(delay: 100.ms).slideX(begin: -0.1),
+                    _NavItem(
+                      icon: Symbols.dns,
+                      label: 'Servers',
+                      isSelected: currentRoute == '/servers',
+                      onTap: () => context.go('/servers'),
+                    ).animate().fadeIn(delay: 200.ms).slideX(begin: -0.1),
+                    _NavItem(
+                      icon: Symbols.rss_feed,
+                      label: 'Subscriptions',
+                      isSelected: currentRoute == '/subscriptions',
+                      onTap: () => context.go('/subscriptions'),
+                    ).animate().fadeIn(delay: 300.ms).slideX(begin: -0.1),
                     _NavItem(
                       icon: Symbols.route,
                       label: 'Routing',
                       isSelected: currentRoute == '/routing',
                       onTap: () => context.go('/routing'),
-                    ),
+                    ).animate().fadeIn(delay: 400.ms).slideX(begin: -0.1),
                     _NavItem(
                       icon: Symbols.settings_input_component,
                       label: 'Settings',
                       isSelected: currentRoute == '/settings',
                       onTap: () => context.go('/settings'),
-                    ),
+                    ).animate().fadeIn(delay: 500.ms).slideX(begin: -0.1),
                   ],
                 ),
               ),
@@ -172,20 +188,20 @@ class _NavItem extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.white : (transparent ? Colors.transparent : Colors.transparent),
+            color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             children: [
               Icon(
                 icon,
-                color: isSelected ? Colors.black : Colors.white.withOpacity(0.4),
+                color: isSelected ? Colors.black : Colors.white.withValues(alpha: 0.4),
               ),
               const SizedBox(width: 12),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? Colors.black : Colors.white.withOpacity(0.6),
+                  color: isSelected ? Colors.black : Colors.white.withValues(alpha: 0.6),
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),

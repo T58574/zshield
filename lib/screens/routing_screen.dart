@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../widgets/glass_panel.dart';
 import '../providers/config_provider.dart';
+import '../widgets/status_glow.dart';
+import '../core/theme/app_theme.dart';
 
 class RoutingScreen extends ConsumerStatefulWidget {
   const RoutingScreen({super.key});
@@ -91,18 +93,21 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
                 ),
                 Row(
                   children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(color: Colors.white, blurRadius: 10, spreadRadius: 2),
-                        ],
+                    StatusGlow(
+                      animate: true,
+                      color: AppTheme.accent,
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppTheme.accent,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Text('STATUS: PROTECTED', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white60, fontSize: 11)),
                     const SizedBox(width: 24),
                     const Icon(Symbols.notifications, color: Colors.white60),
@@ -218,9 +223,9 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
                           width: 300,
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
+                            color: Colors.white.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white.withOpacity(isRouted ? 0.4 : 0.1)),
+                            border: Border.all(color: Colors.white.withValues(alpha: isRouted ? 0.4 : 0.1)),
                           ),
                           child: Row(
                             children: [
@@ -238,7 +243,7 @@ class _RoutingScreenState extends ConsumerState<RoutingScreen> {
                               Switch(
                                 value: isRouted,
                                 onChanged: (val) => ref.read(configProvider.notifier).toggleAppRouting(appName),
-                                activeColor: Colors.black,
+                                activeThumbColor: Colors.black,
                                 activeTrackColor: Colors.white,
                                 inactiveThumbColor: Colors.white54,
                                 inactiveTrackColor: Colors.white10,
@@ -278,15 +283,24 @@ class _ModeCard extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.02),
+          color: isSelected ? AppTheme.accent.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.02),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? Colors.white : Colors.white.withOpacity(0.1),
-            width: isSelected ? 2 : 1,
+            color: isSelected ? AppTheme.accent.withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.1),
+            width: 0.5,
           ),
+          boxShadow: [
+            if (isSelected)
+              BoxShadow(
+                color: AppTheme.accent.withValues(alpha: 0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

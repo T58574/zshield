@@ -9,6 +9,7 @@ class ConfigState {
   final String vlessLink;
   final bool isProxyMode; // true = Proxy, false = Tunnel
   final List<String> routedApps;
+  final String? selectedServerId;
   final bool killSwitch;
   final bool autoConnect;
   final bool lanVisibility;
@@ -18,6 +19,7 @@ class ConfigState {
     this.vlessLink = '',
     this.isProxyMode = false,
     this.routedApps = const [],
+    this.selectedServerId,
     this.killSwitch = true,
     this.autoConnect = true,
     this.lanVisibility = false,
@@ -28,6 +30,8 @@ class ConfigState {
     String? vlessLink,
     bool? isProxyMode,
     List<String>? routedApps,
+    String? selectedServerId,
+    bool clearSelectedServer = false,
     bool? killSwitch,
     bool? autoConnect,
     bool? lanVisibility,
@@ -37,6 +41,7 @@ class ConfigState {
       vlessLink: vlessLink ?? this.vlessLink,
       isProxyMode: isProxyMode ?? this.isProxyMode,
       routedApps: routedApps ?? this.routedApps,
+      selectedServerId: clearSelectedServer ? null : (selectedServerId ?? this.selectedServerId),
       killSwitch: killSwitch ?? this.killSwitch,
       autoConnect: autoConnect ?? this.autoConnect,
       lanVisibility: lanVisibility ?? this.lanVisibility,
@@ -56,6 +61,7 @@ class ConfigNotifier extends Notifier<ConfigState> {
       vlessLink: _prefs.getString('vlessLink') ?? '',
       isProxyMode: _prefs.getBool('isProxyMode') ?? false,
       routedApps: _prefs.getStringList('routedApps') ?? [],
+      selectedServerId: _prefs.getString('selectedServerId'),
       killSwitch: _prefs.getBool('killSwitch') ?? true,
       autoConnect: _prefs.getBool('autoConnect') ?? true,
       lanVisibility: _prefs.getBool('lanVisibility') ?? false,
@@ -71,6 +77,16 @@ class ConfigNotifier extends Notifier<ConfigState> {
   void setRoutingMode(bool isProxy) {
     state = state.copyWith(isProxyMode: isProxy);
     _prefs.setBool('isProxyMode', isProxy);
+  }
+
+  void setSelectedServer(String? id) {
+    if (id == null) {
+      state = state.copyWith(clearSelectedServer: true);
+      _prefs.remove('selectedServerId');
+    } else {
+      state = state.copyWith(selectedServerId: id);
+      _prefs.setString('selectedServerId', id);
+    }
   }
 
   void toggleAppRouting(String appName) {
@@ -99,7 +115,13 @@ class ConfigNotifier extends Notifier<ConfigState> {
 
   void resetSettings() {
     state = const ConfigState();
-    _prefs.clear();
+    _prefs.remove('vlessLink');
+    _prefs.remove('isProxyMode');
+    _prefs.remove('routedApps');
+    _prefs.remove('killSwitch');
+    _prefs.remove('autoConnect');
+    _prefs.remove('lanVisibility');
+    _prefs.remove('customDns');
   }
 }
 

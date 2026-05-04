@@ -40,6 +40,11 @@ dependencies:
   material_symbols_icons: ^4.2928.1
   shared_preferences: ^2.5.5
   path_provider: ^2.1.5
+  http: ^1.6.0
+  supabase_flutter: ^2.12.4
+  url_launcher: ^6.3.2
+  flutter_animate: ^4.5.2
+  fl_chart: ^1.2.0
 
 dev_dependencies:
   flutter_test:

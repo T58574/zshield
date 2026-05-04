@@ -1,16 +1,55 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../providers/config_provider.dart';
 
 class XrayService {
   Process? _xrayProcess;
   bool _isRunning = false;
+  bool _proxyEnabled = false;
+  String? _cachedXrayPath;
+  Function(int)? onExit;
 
   bool get isRunning => _isRunning;
 
+  Future<Map<String, int>> getTrafficStats() async {
+    if (!_isRunning) return {'uplink': 0, 'downlink': 0};
+    try {
+      final xrayPath = await _extractXray();
+      final result = await Process.run(xrayPath, ['api', 'statsquery', '--server=127.0.0.1:10085']);
+      if (result.exitCode == 0) {
+        int uplink = 0;
+        int downlink = 0;
+        final json = jsonDecode(result.stdout as String);
+        if (json['stat'] != null) {
+          for (var item in json['stat']) {
+            final name = item['name'] as String;
+            final value = int.tryParse(item['value']?.toString() ?? '0') ?? 0;
+            if (name.contains('api')) continue; // Skip api traffic
+            
+            if (name.endsWith('>>>downlink')) {
+              downlink += value;
+            } else if (name.endsWith('>>>uplink')) {
+              uplink += value;
+            }
+          }
+        }
+        return {'uplink': uplink, 'downlink': downlink};
+      }
+    } catch (e) {
+      debugPrint("Error fetching stats: $e");
+    }
+    return {'uplink': 0, 'downlink': 0};
+  }
+
   Future<String> _extractXray() async {
+    // Return cached path if available and file still exists
+    if (_cachedXrayPath != null && await File(_cachedXrayPath!).exists()) {
+      return _cachedXrayPath!;
+    }
+
     final docDir = await getApplicationSupportDirectory();
     final String binaryName = Platform.isWindows ? 'xray.exe' : (Platform.isMacOS ? 'xray_mac' : 'xray_linux');
     final String separator = Platform.pathSeparator;
@@ -28,6 +67,8 @@ class XrayService {
         throw Exception("Core executable not found for this platform. Please ensure assets/core/$binaryName exists.");
       }
     }
+
+    _cachedXrayPath = xrayPath;
     return xrayPath;
   }
 
@@ -42,18 +83,31 @@ class XrayService {
       await File(configPath).writeAsString(configJson);
 
       if (configState.isProxyMode) {
-        _setSystemProxy(true);
+        await _setSystemProxy(true);
+        _proxyEnabled = true;
       }
 
       _xrayProcess = await Process.start(xrayPath, ['run', '-c', configPath]);
       _isRunning = true;
+      
+      _xrayProcess?.stdout.transform(utf8.decoder).listen((data) => debugPrint("XRAY STDOUT: $data"));
+      _xrayProcess?.stderr.transform(utf8.decoder).listen((data) => debugPrint("XRAY STDERR: $data"));
 
       _xrayProcess?.exitCode.then((code) {
         _isRunning = false;
-        if (configState.isProxyMode) _setSystemProxy(false);
+        debugPrint("Xray process exited with code $code");
+        if (_proxyEnabled) {
+          _setSystemProxy(false);
+          _proxyEnabled = false;
+        }
+        onExit?.call(code);
       });
     } catch (e) {
       _isRunning = false;
+      if (_proxyEnabled) {
+        await _setSystemProxy(false);
+        _proxyEnabled = false;
+      }
       rethrow;
     }
   }
@@ -61,21 +115,36 @@ class XrayService {
   Future<void> stop() async {
     if (!_isRunning) return;
     
-    _setSystemProxy(false); 
+    if (_proxyEnabled) {
+      await _setSystemProxy(false);
+      _proxyEnabled = false;
+    }
     
-    _xrayProcess?.kill();
+    // Graceful shutdown: try SIGTERM first, then force kill after timeout
+    if (Platform.isWindows) {
+      _xrayProcess?.kill();
+    } else {
+      _xrayProcess?.kill(ProcessSignal.sigterm);
+      await Future.delayed(const Duration(seconds: 2));
+      try {
+        _xrayProcess?.kill(ProcessSignal.sigkill);
+      } catch (_) {
+        // Process may have already exited
+      }
+    }
     _xrayProcess = null;
     _isRunning = false;
   }
 
-  void _setSystemProxy(bool enable) {
-    if (!Platform.isWindows) return; // Mac/Linux system proxy implementation omitted for brevity
+  /// Set system proxy (async to avoid blocking UI thread)
+  Future<void> _setSystemProxy(bool enable) async {
+    if (!Platform.isWindows) return;
     
     if (enable) {
-      Process.runSync('reg', ['add', r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings', '/v', 'ProxyEnable', '/t', 'REG_DWORD', '/d', '1', '/f']);
-      Process.runSync('reg', ['add', r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings', '/v', 'ProxyServer', '/t', 'REG_SZ', '/d', '127.0.0.1:10808', '/f']);
+      await Process.run('reg', ['add', r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings', '/v', 'ProxyEnable', '/t', 'REG_DWORD', '/d', '1', '/f']);
+      await Process.run('reg', ['add', r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings', '/v', 'ProxyServer', '/t', 'REG_SZ', '/d', '127.0.0.1:10809', '/f']);
     } else {
-      Process.runSync('reg', ['add', r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings', '/v', 'ProxyEnable', '/t', 'REG_DWORD', '/d', '0', '/f']);
+      await Process.run('reg', ['add', r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings', '/v', 'ProxyEnable', '/t', 'REG_DWORD', '/d', '0', '/f']);
     }
   }
 
@@ -84,18 +153,24 @@ class XrayService {
     // Format: vless://uuid@address:port?security=tls&encryption=none&type=ws&host=xyz&path=/xyz#name
     String address = "example.com";
     int port = 443;
-    String id = "uuid";
+    String id = "00000000-0000-0000-0000-000000000000";
     String flow = "";
     String security = "none";
     String type = "tcp";
     String path = "";
     String host = "";
     String sni = "";
+    String pbk = "";
+    String sid = "";
+    String fp = "chrome";
+    String spx = "/";
 
     try {
       final uri = Uri.parse(configState.vlessLink);
       final userInfo = uri.userInfo.split(':');
-      id = userInfo[0];
+      if (userInfo.isNotEmpty && userInfo[0].isNotEmpty) {
+        id = userInfo[0];
+      }
       address = uri.host;
       port = uri.port;
       
@@ -105,104 +180,163 @@ class XrayService {
       host = uri.queryParameters['host'] ?? '';
       sni = uri.queryParameters['sni'] ?? '';
       flow = uri.queryParameters['flow'] ?? '';
+      pbk = uri.queryParameters['pbk'] ?? '';
+      sid = uri.queryParameters['sid'] ?? '';
+      fp = uri.queryParameters['fp'] ?? 'chrome';
+      spx = uri.queryParameters['spx'] ?? '/';
     } catch (e) {
-      // Parse error ignored
+      debugPrint("Error parsing VLESS link: $e");
     }
 
-    final inbound = configState.isProxyMode 
-      ? {
-          "port": 10808,
-          "listen": "127.0.0.1",
-          "protocol": "socks",
-          "settings": {
-            "udp": true,
-            "auth": "noauth"
-          },
-          "sniffing": {
-            "enabled": true,
-            "destOverride": ["http", "tls"]
-          }
+    // Both modes use SOCKS+HTTP inbounds since Xray-core does not support TUN natively.
+    // In proxy mode, system proxy is set to HTTP inbound.
+    // In "tunnel" mode, the same SOCKS+HTTP inbounds are used (TUN requires external tun2socks).
+    final List<Map<String, dynamic>> inbounds = [
+      {
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+          "udp": true,
+          "auth": "noauth"
+        },
+        "sniffing": {
+          "enabled": true,
+          "destOverride": ["http", "tls"]
         }
-      : {
-          "port": 10808,
-          "listen": "127.0.0.1",
-          "protocol": "tun",
-          "settings": {
-            "network": "10.0.0.1/24",
-            "autoRoute": true,
-            "strictRoute": configState.killSwitch
-          }
-        };
-
-    Map<String, dynamic> config = {
-      "log": {
-        "loglevel": "warning"
       },
-      "dns": configState.customDns ? {
-        "servers": ["1.1.1.1", "8.8.8.8", "localhost"]
-      } : null,
-      "inbounds": [inbound],
-      "outbounds": [
-        {
-          "tag": "proxy",
-          "protocol": "vless",
-          "settings": {
-            "vnext": [
+      {
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "settings": {
+          "allowTransparent": false
+        }
+      },
+    ];
+
+    // Stats API inbound
+    inbounds.add({
+      "port": 10085,
+      "listen": "127.0.0.1",
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "127.0.0.1"
+      },
+      "tag": "api-inbound"
+    });
+
+    // Build outbounds
+    final Map<String, dynamic> proxyOutbound = {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": address,
+            "port": port,
+            "users": [
               {
-                "address": address,
-                "port": port,
-                "users": [
-                  {
-                    "id": id,
-                    "encryption": "none",
-                    "flow": flow.isNotEmpty ? flow : null
-                  }
-                ]
+                "id": id,
+                "encryption": "none",
+                if (flow.isNotEmpty) "flow": flow
               }
             ]
-          },
-          "streamSettings": {
-            "network": type,
-            "security": security,
-            "tlsSettings": security == 'tls' || security == 'reality' ? {
-              "serverName": sni.isNotEmpty ? sni : (host.isNotEmpty ? host : address),
-              "allowInsecure": false,
-            } : null,
-            "wsSettings": type == 'ws' ? {
-              "path": path,
-              "headers": host.isNotEmpty ? {"Host": host} : {}
-            } : null,
-          }
-        },
-        {
-          "protocol": "freedom",
-          "tag": "direct"
-        }
-      ],
-      "routing": {
-        "domainStrategy": "AsIs",
-        "rules": [
-          if (configState.lanVisibility) {
-            "type": "field",
-            "ip": ["geoip:private"],
-            "outboundTag": "direct"
           }
         ]
+      },
+      "streamSettings": {
+        "network": type,
+        "security": security,
+        if (security == 'tls') "tlsSettings": {
+          "serverName": sni.isNotEmpty ? sni : (host.isNotEmpty ? host : address),
+          "allowInsecure": false,
+        },
+        if (security == 'reality') "realitySettings": {
+          "serverName": sni.isNotEmpty ? sni : (host.isNotEmpty ? host : address),
+          "publicKey": pbk,
+          "fingerprint": fp,
+          "shortId": sid,
+          "spiderX": spx,
+        },
+        if (type == 'ws') "wsSettings": {
+          "path": path,
+          "headers": host.isNotEmpty ? {"Host": host} : {}
+        },
       }
     };
-    
-    if (configState.routedApps.isNotEmpty) {
-      config["routing"]["rules"].insert(0, {
+
+    // Routing rules
+    final List<Map<String, dynamic>> rules = [
+      {
+        "inboundTag": ["api-inbound"],
+        "outboundTag": "api",
+        "type": "field"
+      },
+    ];
+
+    if (configState.lanVisibility) {
+      rules.add({
+        "type": "field",
+        "ip": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "fc00::/7", "fe80::/10"],
+        "outboundTag": "direct"
+      });
+    }
+
+    if (configState.isProxyMode && configState.routedApps.isNotEmpty) {
+      rules.add({
         "type": "field",
         "process": configState.routedApps,
         "outboundTag": "proxy"
       });
-      config["routing"]["rules"].insert(1, {
+      rules.add({
         "type": "field",
         "network": "tcp,udp",
         "outboundTag": "direct"
       });
     }
+
+    Map<String, dynamic> config = {
+      "log": {
+        "loglevel": "warning"
+      },
+      "api": {
+        "tag": "api",
+        "services": [
+          "HandlerService",
+          "LoggerService",
+          "StatsService"
+        ]
+      },
+      "stats": {},
+      "policy": {
+        "system": {
+          "statsInboundUplink": true,
+          "statsInboundDownlink": true,
+          "statsOutboundUplink": true,
+          "statsOutboundDownlink": true
+        }
+      },
+      if (configState.customDns) "dns": {
+        "servers": ["1.1.1.1", "8.8.8.8", "localhost"]
+      },
+      "inbounds": inbounds,
+      "outbounds": [
+        proxyOutbound,
+        {
+          "protocol": "freedom",
+          "tag": "direct"
+        },
+        {
+          "protocol": "blackhole",
+          "tag": "block"
+        }
+      ],
+      "routing": {
+        "domainStrategy": "AsIs",
+        "rules": rules
+      }
+    };
 
     return jsonEncode(config);
   }

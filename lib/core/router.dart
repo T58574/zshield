@@ -3,6 +3,10 @@ import '../screens/layout.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/routing_screen.dart';
+import '../screens/servers_screen.dart';
+import '../screens/auth_screen.dart';
+import '../screens/subscription_screen.dart';
+import '../screens/premium_plan_screen.dart';
 
 import 'package:flutter/material.dart';
 
@@ -41,12 +45,34 @@ final appRouter = GoRouter(
           ),
         ),
         GoRoute(
+          path: '/servers',
+          pageBuilder: (context, state) => buildPageWithDefaultTransition(
+            context: context, state: state, child: const ServersScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/subscriptions',
+          pageBuilder: (context, state) => buildPageWithDefaultTransition(
+            context: context, state: state, child: const SubscriptionScreen(),
+          ),
+        ),
+        GoRoute(
           path: '/settings',
           pageBuilder: (context, state) => buildPageWithDefaultTransition(
             context: context, state: state, child: const SettingsScreen(),
           ),
         ),
+        GoRoute(
+          path: '/premium',
+          pageBuilder: (context, state) => buildPageWithDefaultTransition(
+            context: context, state: state, child: const PremiumPlanScreen(),
+          ),
+        ),
       ],
+    ),
+    GoRoute(
+      path: '/auth',
+      builder: (context, state) => const AuthScreen(),
     ),
   ],
 );

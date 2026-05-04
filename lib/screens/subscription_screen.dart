@@ -1,0 +1,190 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_symbols_icons/symbols.dart';
+import '../providers/subscription_provider.dart';
+import '../widgets/glass_panel.dart';
+import '../core/theme/app_theme.dart';
+import 'package:intl/intl.dart';
+
+class SubscriptionScreen extends ConsumerWidget {
+  const SubscriptionScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subscriptions = ref.watch(subscriptionProvider);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(40.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Subscriptions', style: Theme.of(context).textTheme.displayLarge),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Manage your external server sources.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _showAddSubscriptionDialog(context, ref),
+                  icon: const Icon(Symbols.add_link, size: 20),
+                  label: const Text('ADD SUBSCRIPTION'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accent,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 40),
+
+            if (subscriptions.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 100),
+                  child: Column(
+                    children: [
+                      Icon(Symbols.rss_feed, size: 64, color: Colors.white10),
+                      const SizedBox(height: 24),
+                      Text('No subscriptions added yet.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white30)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: subscriptions.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 16),
+                itemBuilder: (context, index) {
+                  final sub = subscriptions[index];
+                  return _SubscriptionCard(subscription: sub);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddSubscriptionDialog(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController();
+    final urlController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Add Subscription'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Name (e.g. My Premium VPN)'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: urlController,
+              decoration: const InputDecoration(labelText: 'Subscription URL'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.isNotEmpty && urlController.text.isNotEmpty) {
+                ref.read(subscriptionProvider.notifier).addSubscription(
+                  nameController.text,
+                  urlController.text,
+                );
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('ADD & FETCH'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubscriptionCard extends ConsumerWidget {
+  final Subscription subscription;
+
+  const _SubscriptionCard({required this.subscription});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lastUpdatedStr = DateFormat('yyyy-MM-dd HH:mm').format(subscription.lastUpdated);
+
+    return GlassPanel(
+      padding: const EdgeInsets.all(24),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Symbols.rss_feed, color: AppTheme.accent, size: 24),
+          ),
+          const SizedBox(width: 24),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(subscription.name, style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 4),
+                Text(subscription.url, 
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11, color: Colors.white30),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Text('Last updated: $lastUpdatedStr', 
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10, color: Colors.white24),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Symbols.refresh, color: Colors.white54),
+                onPressed: () => ref.read(subscriptionProvider.notifier).fetchSubscription(subscription.id),
+                tooltip: 'Refresh servers',
+              ),
+              IconButton(
+                icon: const Icon(Symbols.delete, color: Colors.redAccent.withOpacity(0.5)),
+                onPressed: () => ref.read(subscriptionProvider.notifier).removeSubscription(subscription.id),
+                tooltip: 'Delete subscription',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -36,7 +36,7 @@ class GlassButton extends StatelessWidget {
               borderRadius: effectiveRadius,
             ),
             elevation: 8,
-            shadowColor: Colors.white.withOpacity(0.3),
+            shadowColor: Colors.white.withValues(alpha: 0.3),
           ),
           child: child,
         ),
@@ -53,10 +53,10 @@ class GlassButton extends StatelessWidget {
           child: OutlinedButton(
             onPressed: onPressed,
             style: OutlinedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.1),
+              backgroundColor: Colors.white.withValues(alpha: 0.1),
               foregroundColor: Colors.white,
               side: BorderSide(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 1.0,
               ),
               shape: RoundedRectangleBorder(

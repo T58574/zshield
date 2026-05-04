@@ -6,6 +6,7 @@ class AppTheme {
   static const Color background = Color(0xFF000000); // Base Layer
   static const Color surface = Color(0xFF121414);
   static const Color primary = Color(0xFFFFFFFF);
+  static const Color accent = Color(0xFF00FFD1); // Cyber Teal
   static const Color onSurface = Color(0xFFe3e2e2);
   static const Color onSurfaceVariant = Color(0xFFc4c7c8);
   static const Color error = Color(0xFFffb4ab);
@@ -68,7 +69,7 @@ class AppTheme {
           fontSize: 13,
           fontWeight: FontWeight.w400,
           height: 1.0,
-          color: primary.withOpacity(0.6),
+          color: primary.withValues(alpha: 0.6),
         ),
       ),
     );
