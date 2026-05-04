@@ -49,6 +49,10 @@ class SubscriptionNotifier extends Notifier<List<Subscription>> {
   }
 
   Future<void> addSubscription(String name, String url) async {
+    // Check if URL already exists
+    final exists = state.any((s) => s.url == url);
+    if (exists) return;
+
     final sub = Subscription(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
@@ -86,15 +90,34 @@ class SubscriptionNotifier extends Notifier<List<Subscription>> {
           line = line.trim();
           if (line.isEmpty) continue;
           
-          // Only support VLESS as requested
+          // Support VLESS, VMess, and SS
+          ServerProtocol? protocol;
           if (line.startsWith('vless://')) {
+            protocol = ServerProtocol.vless;
+          } else if (line.startsWith('vmess://')) {
+            protocol = ServerProtocol.vmess;
+          } else if (line.startsWith('ss://')) {
+            protocol = ServerProtocol.ss;
+          } else if (line.startsWith('trojan://')) {
+            protocol = ServerProtocol.trojan;
+          }
+
+          if (protocol != null) {
             String sName = "Server";
             try {
-              final uri = Uri.parse(line);
-              if (uri.fragment.isNotEmpty) {
-                sName = Uri.decodeComponent(uri.fragment);
+              if (protocol == ServerProtocol.vmess) {
+                // VMess is often JSON encoded inside base64 after the protocol
+                final vmessData = line.substring(8);
+                final decodedVmess = utf8.decode(base64.decode(_normalizeBase64(vmessData)));
+                final vmessJson = jsonDecode(decodedVmess);
+                sName = vmessJson['ps'] ?? "VMess Server";
               } else {
-                sName = uri.host;
+                final uri = Uri.parse(line);
+                if (uri.fragment.isNotEmpty) {
+                  sName = Uri.decodeComponent(uri.fragment);
+                } else {
+                  sName = uri.host;
+                }
               }
             } catch (_) {}
 
@@ -102,7 +125,7 @@ class SubscriptionNotifier extends Notifier<List<Subscription>> {
               id: '${sub.id}_${servers.length}_${DateTime.now().millisecondsSinceEpoch}',
               name: sName,
               link: line,
-              protocol: ServerProtocol.vless,
+              protocol: protocol,
               subscriptionId: sub.id,
             ));
           }

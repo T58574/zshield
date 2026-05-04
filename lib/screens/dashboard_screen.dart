@@ -12,6 +12,7 @@ import '../providers/config_provider.dart';
 import '../providers/traffic_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/premium_server_provider.dart';
+import '../providers/subscription_provider.dart';
 import 'package:go_router/go_router.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -93,9 +94,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     // Attempt to extract validity or set mock
     String validUntil = 'Нет ссылки';
+    bool isSubscription = configState.vlessLink.startsWith('http');
 
     if (configState.vlessLink.isNotEmpty && (configState.vlessLink.startsWith('vless://') || configState.vlessLink.startsWith('vmess://'))) {
-      validUntil = 'Активно (Токен валиден)';
+      validUntil = 'Активно (Конфиг)';
+    } else if (isSubscription) {
+      validUntil = 'Активно (Подписка)';
     } else if (configState.vlessLink.isNotEmpty) {
       validUntil = 'Неверный формат ссылки';
     }
@@ -280,7 +284,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               Expanded(
                                 child: TextField(
                                   controller: _vlessLinkController,
-                                  onChanged: (val) => configNotifier.setVlessLink(val),
+                                  onChanged: (val) {
+                                    configNotifier.setVlessLink(val);
+                                    // Auto-add to subscriptions if it's a URL
+                                    if (val.startsWith('http')) {
+                                      ref.read(subscriptionProvider.notifier).addSubscription(
+                                        'Main Subscription', 
+                                        val.trim()
+                                      );
+                                    }
+                                  },
                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: Colors.white, 
                                     fontSize: 11
@@ -342,7 +355,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildStatCard(BuildContext context, String title, IconData icon, String value, String subtitle, {bool isProgress = false}) {
     return GlassPanel(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
